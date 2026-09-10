@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clan Of Cousins</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+<!-- Firebase App & Realtime Database CDN SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-analytics-compat.js"></script>
+
+<style>
+  :root {
+    --primary: #00f5d4; --secondary: #9b5de5; --accent: #ffd166;
+    --bg1: #0a192f; --bg2: #112240; --bg3: #1a365d; --card: rgba(255,255,255,0.05);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; }
+  body { background: linear-gradient(135deg, var(--bg1), var(--bg2), var(--bg3)); color: #fff; min-height: 100vh; }
+  .hidden { display: none !important; }
+
+  /* LOGIN & REGISTER */
+  #login-page { position: fixed; inset: 0; background: #000; z-index: 9999; display: flex; justify-content: center; align-items: center; overflow-y: auto; padding: 20px; }
+  .login-box { background: var(--card); padding: 30px 40px; border-radius: 20px; backdrop-filter: blur(20px); width: 90%; max-width: 400px; text-align: center; border: 1px solid var(--primary); box-shadow: 0 0 30px rgba(0,245,212,0.2); }
+  .login-box input { width: 100%; padding: 12px; margin: 8px 0; border-radius: 10px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: #fff; outline: none; }
+  .login-box input:focus { border-color: var(--primary); }
+  .error { color: #ff3d00; font-size: 14px; display: none; margin-top: 5px; }
+  .switch-auth { font-size: 13px; margin-top: 15px; cursor: pointer; color: var(--primary); text-decoration: underline; }
+
+  /* LAYOUT */
+  nav { position: sticky; top: 0; width: 100%; padding: 15px 5%; background: rgba(0,0,0,0.5); backdrop-filter: blur(15px); display: flex; justify-content: space-between; align-items: center; z-index: 1000; border-bottom: 1px solid var(--primary); }
+  nav h1 { color: var(--primary); font-size: clamp(18px, 4vw, 24px); }
+  .nav-btns { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .btn { padding: 10px 20px; border: 2px solid var(--primary); background: transparent; color: var(--primary); border-radius: 50px; cursor: pointer; font-weight: 600; transition: 0.3s; }
+  .btn:hover, .btn.active { background: var(--primary); color: #000; transform: translateY(-2px); }
+  .btn-danger { border-color: #ff3d00; color: #ff3d00; }
+  .btn-danger:hover { background: #ff3d00; color: #fff; }
+
+  .page { padding: 80px 5%; min-height: 90vh; animation: fadeIn 0.5s; }
+  @keyframes fadeIn { from{opacity:0; transform:translateY(20px)} to{opacity:1; transform:translateY(0)} }
+  h3 { font-size: clamp(28px, 5vw, 40px); text-align: center; margin-bottom: 40px; color: var(--primary); }
+
+  /* CARDS & PREMIUM MEMBER ANIMATED CARDS */
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px; }
+  .card { background: var(--card); border-radius: 20px; padding: 20px; backdrop-filter: blur(15px); border: 1px solid rgba(255,255,255,0.1); transition: 0.3s; }
+  .card:hover { transform: translateY(-5px); border-color: var(--primary); }
+  
+  /* Premium Animated Card View for Members */
+  .member-card {
+    position: relative;
+    border-radius: 20px;
+    overflow: hidden;
+    cursor: pointer;
+    background: linear-gradient(135deg, rgba(255,255,255,0.05), rgba(0,245,212,0.05));
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    transition: all 0.4s ease;
+  }
+  .member-card::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    z-index: -1;
+    border-radius: 22px;
+    background: linear-gradient(45deg, var(--primary), var(--secondary), var(--accent), var(--primary));
+    background-size: 300% 300%;
+    animation: borderGlow 6s ease infinite;
+  }
+  @keyframes borderGlow {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+  .member-card:hover {
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: 0 15px 40px rgba(0,245,212,0.3);
+  }
+  .member-card img { width: 100%; height: 250px; object-fit: cover; border-radius: 15px; margin-bottom: 15px; }
+
+  .post-card { margin-bottom: 20px; }
+  .post-card .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; }
+  .post-card .actions button { padding: 5px 10px; font-size: 12px; margin-left: 5px; }
+  .post-media { width: 100%; max-height: 400px; object-fit: cover; border-radius: 12px; margin-top: 10px; margin-bottom: 10px; cursor: pointer; }
+
+  /* FORM */
+  .form-group { margin-bottom: 15px; }
+  .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: #fff; outline: none; }
+  .form-group input[type="file"] { padding: 8px; cursor: pointer; }
+
+  /* MODAL FOR PROFILE VIEW & EDIT */
+  .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 10000; display: flex; justify-content: center; align-items: center; padding: 20px; }
+  .modal-content { background: var(--bg2); border: 1px solid var(--primary); padding: 30px; border-radius: 20px; width: 100%; max-width: 700px; max-height: 90vh; overflow-y: auto; position: relative; box-shadow: 0 0 40px rgba(0,245,212,0.3); }
+  .close-modal { position: absolute; top: 15px; right: 20px; font-size: 24px; cursor: pointer; color: var(--primary); z-index: 10; }
+
+  /* IMPROVED & BEAUTIFIED PROFILE GRID MEDIA DISPLAY */
+  .profile-grid-container { 
+    display: grid; 
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); 
+    gap: 15px; 
+    margin-top: 15px; 
+  }
+  .profile-grid-item { 
+    position: relative; 
+    width: 100%; 
+    height: 130px; 
+    border-radius: 15px; 
+    overflow: hidden; 
+    border: 2px solid rgba(0,245,212,0.4); 
+    background: #000; 
+    box-shadow: 0 6px 15px rgba(0,0,0,0.4);
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    cursor: pointer;
+  }
+  .profile-grid-item:hover {
+    transform: scale(1.05);
+    border-color: var(--primary);
+    box-shadow: 0 0 20px rgba(0,245,212,0.5);
+  }
+  .profile-grid-item img, .profile-grid-item video { 
+    width: 100%; 
+    height: 100%; 
+    object-fit: cover; 
+    transition: filter 0.3s ease;
+  }
+  .profile-grid-item:hover img, .profile-grid-item:hover video {
+    filter: brightness(1.15);
+  }
+  
+  /* GRID OVERLAY BUTTONS (Zoom & Download) */
+  .grid-overlay-btns {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+    display: flex;
+    justify-content: space-around;
+    padding: 6px 2px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 3;
+  }
+  .profile-grid-item:hover .grid-overlay-btns {
+    opacity: 1;
+  }
+  .grid-btn {
+    background: rgba(0,0,0,0.6);
+    border: 1px solid var(--primary);
+    color: var(--primary);
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: 0.2s;
+  }
+  .grid-btn:hover {
+    background: var(--primary);
+    color: #000;
+  }
+
+  .delete-media-btn { 
+    position: absolute; 
+    top: 6px; 
+    right: 6px; 
+    background: rgba(255, 61, 0, 0.9); 
+    color: #fff; 
+    border: none; 
+    border-radius: 50%; 
+    width: 24px; 
+    height: 24px; 
+    font-size: 13px; 
+    cursor: pointer; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+    transition: background 0.2s, transform 0.2s;
+    z-index: 4;
+  }
+  .delete-media-btn:hover {
+    background: #ff3d00;
+    transform: scale(1.15);
+  }
+
+  /* FULLSCREEN MEDIA LIGHTBOX (ZOOM & DOWNLOAD MODAL) */
+  #lightbox-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.95);
+    z-index: 20000;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    backdrop-filter: blur(10px);
+  }
+  .lightbox-content-wrapper {
+    position: relative;
+    max-width: 90vw;
+    max-height: 80vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  .lightbox-media {
+    max-width: 100%;
+    max-height: 80vh;
+    border-radius: 15px;
+    box-shadow: 0 0 30px rgba(0, 245, 212, 0.4);
+    border: 2px solid var(--primary);
+    object-fit: contain;
+  }
+  .lightbox-actions {
+    margin-top: 20px;
+    display: flex;
+    gap: 15px;
+  }
+
+  /* BUBBLE */
+  #bubble-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+  .bubble { position: absolute; bottom: -100px; border-radius: 50%; background: radial-gradient(circle, rgba(0,245,212,0.1), transparent); animation: rise linear infinite; }
+  @keyframes rise { to { transform: translateY(-120vh) scale(0); opacity: 0; } }
+</style>
+</head>
+<body>
+
+<!-- LOGIN & REGISTER PAGE -->
+<div id="login-page">
+  <div class="login-box" id="login-box-container">
+    <h2>Clan of Cousins</h2>
+    <p style="opacity:0.7; margin-bottom:20px;">Dev: Nafis Ahmed Ratul</p>
+    
+    <div id="login-form-div">
+      <input type="email" id="login-email" placeholder="Email">
+      <input type="password" id="login-password" placeholder="Password">
+      <p class="error" id="login-error">Wrong Email or Password!</p>
+      <button class="btn" onclick="login()" style="width:100%; margin-top:10px;">Login</button>
+      <p class="switch-auth" onclick="toggleAuthMode(true)">Don't have an account? Register here</p>
+    </div>
+
+    <div id="register-form-div" class="hidden">
+      <input type="text" id="reg-name" placeholder="Full Name">
+      <input type="email" id="reg-email" placeholder="Email">
+      <input type="password" id="reg-password" placeholder="Password">
+      <input type="text" id="reg-phone" placeholder="Phone Number">
+      <div class="form-group" style="text-align:left; margin-top:10px;">
+        <label style="font-size:12px; opacity:0.7;">Profile Picture:</label>
+        <input type="file" id="reg-img" accept="image/*">
+      </div>
+      <p class="error" id="reg-error">Please fill all fields & choose a picture!</p>
+      <button class="btn" onclick="register()" style="width:100%; margin-top:10px;">Register Account</button>
+      <p class="switch-auth" onclick="toggleAuthMode(false)">Already have an account? Login here</p>
+    </div>
+
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="main-app" class="hidden">
+  <div id="bubble-container"></div>
+  
+  <nav>
+    <h1>Clan Of Cousins</h1>
+    <div class="nav-btns">
+      <button class="btn active" onclick="showPage('dashboard')">Dashboard</button>
+      <button class="btn" onclick="showPage('members')">Cousins</button>
+      <button class="btn" onclick="showPage('feed')">Family Feeds</button>
+      <button class="btn hidden" id="admin-btn" onclick="showPage('admin')">Admin Panel</button>
+      <button class="btn btn-danger" onclick="logout()">Logout💠</button>
+    </div>
+  </nav>
+
+  <!-- PAGE 1: DASHBOARD -->
+  <div id="dashboard" class="page">
+    <h3>Welcome, <span id="welcome-user"></span> ❤️</h3>
+    <div class="grid">
+      <div class="card"><h4>Total Members</h4><p id="total-members">0</p></div>
+      <div class="card"><h4>Total Posts</h4><p id="total-posts">0</p></div>
+      <div class="card"><h4>Your Role</h4><p id="user-role"></p></div>
+    </div>
+    <div class="card" style="margin-top:30px; text-align:center;">
+      <h4>My Profile Quick Access</h4>
+      <button class="btn" onclick="openProfile(currentUser.id)" style="margin-top:15px;">Edit / View My Profile</button>
+    </div>
+  </div>
+
+  <!-- PAGE 2: MEMBERS -->
+  <div id="members" class="page hidden">
+    <h3>Our Family Members</h3>
+    <p style="text-align:center; opacity:0.7; margin-bottom:20px;">Tap on any member's premium animated card to view/edit profile or upload pictures/videos in their grid!</p>
+    <div class="grid" id="members-list"></div>
+  </div>
+
+  <!-- PAGE 3: FEED -->
+  <div id="feed" class="page hidden">
+    <h3>Family Feed</h3>
+    <div class="card">
+      <h4>Create New Post (Photo / Video / Text)</h4>
+      <div class="form-group"><textarea id="post-text" rows="3" placeholder="Ki share korte chao?"></textarea></div>
+      <div class="form-group">
+        <label style="font-size:12px; opacity:0.7;">Upload Picture or Video from Gallery:</label>
+        <input type="file" id="post-file" accept="image/*,video/*">
+      </div>
+      <button class="btn" onclick="createPost()">Post</button>
+    </div>
+    <div id="posts-list"></div>
+  </div>
+
+  <!-- PAGE 4: ADMIN -->
+  <div id="admin" class="page hidden">
+    <h3>Admin Panel</h3>
+    <div class="card" style="margin-bottom:20px;">
+      <h4>Manage All Members</h4>
+      <div id="admin-members-list"></div>
+    </div>
+    <div class="card">
+      <h4>Manage All Posts</h4>
+      <div id="admin-posts-list"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- PROFILE MODAL -->
+<div id="profile-modal" class="modal hidden">
+  <div class="modal-content">
+    <span class="close-modal" onclick="closeProfileModal()">&times;</span>
+    <h3 id="profile-modal-title" style="margin-bottom:20px; font-size:24px;">Profile Details</h3>
+    <div id="profile-modal-body"></div>
+  </div>
+</div>
+
+<!-- LIGHTBOX MODAL FOR ZOOM VIEW & DOWNLOAD -->
+<div id="lightbox-modal" class="hidden">
+  <span class="close-modal" onclick="closeLightbox()">&times;</span>
+  <div class="lightbox-content-wrapper" id="lightbox-content">
+    <!-- Media inserted dynamically -->
+  </div>
+  <div class="lightbox-actions">
+    <a id="lightbox-download-btn" download="cousins_gallery_media" class="btn" style="text-decoration:none;">📥 Download Media</a>
+    <button class="btn btn-danger" onclick="closeLightbox()">Close</button>
+  </div>
+</div>
+
+<script>
+  // FIREBASE INITIALIZATION CONFIGURATION
+  const firebaseConfig = {
+    apiKey: "AIzaSyBo3APu2QRSsW6n_MxXy4dXBmq5DJyKJ0c",
+    authDomain: "coc-65cc3.firebaseapp.com",
+    databaseURL: "https://coc-65cc3-default-rtdb.firebaseio.com",
+    projectId: "coc-65cc3",
+    storageBucket: "coc-65cc3.firebasestorage.app",
+    messagingSenderId: "195195556669",
+    appId: "1:195195556669:web:bc60d368ca2df60c076b54",
+    measurementId: "G-50CVRWV8P1"
+  };
+
+  // Initialize Firebase
+  const app = firebase.initializeApp(firebaseConfig);
+  const analytics = firebase.analytics();
+  const db = firebase.database();
+
+  // DATABASE INITIALIZATION & SYNCHRONIZATION WITH FIREBASE
+  let currentUser = null;
+  let users = [];
+  let posts = [];
+
+  // NO DEFAULT USERS: ONLY REGISTERED USERS WILL EXIST
+  const defaultUsers = [];
+
+  // FETCH DATA FROM FIREBASE REALTIME DATABASE ON LOAD
+  db.ref('familyUsers').on('value', (snapshot) => {
+    const data = snapshot.val();
+    if(data) {
+      users = Array.isArray(data) ? data : Object.values(data);
+    } else {
+      users = defaultUsers;
+      db.ref('familyUsers').set(users);
+    }
+    if(currentUser) {
+      const updatedSelf = users.find(u => u.id === currentUser.id);
+      if(updatedSelf) currentUser = updatedSelf;
+    }
+    if(document.getElementById('main-app') && !document.getElementById('main-app').classList.contains('hidden')) {
+      loadApp();
+    }
+  });
+
+  db.ref('familyPosts').on('value', (snapshot) => {
+    const data = snapshot.val();
+    if(data) {
+      posts = Array.isArray(data) ? data : Object.values(data);
+    } else {
+      posts = [];
+    }
+    if(document.getElementById('main-app') && !document.getElementById('main-app').classList.contains('hidden')) {
+      loadPosts();
+    }
+  });
+
+  // SAVE TO FIREBASE REALTIME DATABASE
+  function saveData() {
+    db.ref('familyUsers').set(users);
+    db.ref('familyPosts').set(posts);
+  }
+
+  // AUTH TOGGLE
+  function toggleAuthMode(isRegister) {
+    document.getElementById('login-error').style.display = 'none';
+    document.getElementById('reg-error').style.display = 'none';
+    if(isRegister) {
+      document.getElementById('login-form-div').classList.add('hidden');
+      document.getElementById('register-form-div').classList.remove('hidden');
+    } else {
+      document.getElementById('register-form-div').classList.add('hidden');
+      document.getElementById('login-form-div').classList.remove('hidden');
+    }
+  }
+
+  // REGISTER SYSTEM
+  function register() {
+    const name = document.getElementById('reg-name').value;
+    const email = document.getElementById('reg-email').value;
+    const password = document.getElementById('reg-password').value;
+    const phone = document.getElementById('reg-phone').value;
+    const fileInput = document.getElementById('reg-img');
+
+    if(!name || !email || !password || !phone || fileInput.files.length === 0) {
+      document.getElementById('reg-error').style.display = 'block';
+      return;
+    }
+
+    if(users.some(u => u.email === email)) {
+      alert("This email is already registered!");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      // First registered user becomes Admin automatically if list is empty
+      const userRole = users.length === 0 ? "Admin" : "Member";
+      
+      const newUser = {
+        id: Date.now(),
+        email: email,
+        password: password,
+        name: name,
+        role: userRole,
+        phone: phone,
+        img: e.target.result,
+        mediaList: []
+      };
+      users.push(newUser);
+      saveData();
+      alert("Registration successful! Please login.");
+      toggleAuthMode(false);
+    };
+    reader.readAsDataURL(fileInput.files[0]);
+  }
+
+  // LOGIN SYSTEM
+  function login() {
+    const emailInput = document.getElementById('login-email').value;
+    const passInput = document.getElementById('login-password').value;
+    const user = users.find(x => x.email === emailInput && x.password === passInput);
+    if(user) {
+      currentUser = user;
+      document.getElementById('login-page').classList.add('hidden');
+      document.getElementById('main-app').classList.remove('hidden');
+      if(user.role === "Admin") document.getElementById('admin-btn').classList.remove('hidden');
+      loadApp();
+    } else { 
+      document.getElementById('login-error').style.display = 'block'; 
+    }
+  }
+  function logout() { location.reload(); }
+
+  // PAGE SWITCHER
+  function showPage(pageId) {
+    document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+    document.getElementById(pageId).classList.remove('hidden');
+    document.querySelectorAll('.nav-btns .btn').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+  }
+
+  // LOAD APP DATA
+  function loadApp() {
+    document.getElementById('welcome-user').innerText = currentUser.name;
+    document.getElementById('user-role').innerText = currentUser.role;
+    document.getElementById('total-members').innerText = users.length;
+    loadMembers();
+    loadPosts();
+  }
+
+  // MEMBERS PAGE WITH PREMIUM ANIMATED CARDS
+  function loadMembers() {
+    const list = document.getElementById('members-list');
+    list.innerHTML = '';
+    users.forEach(u => {
+      list.innerHTML += `
+        <div class="card member-card" onclick="openProfile(${u.id})">
+          <img src="${u.img}" alt="${u.name}">
+          <h4 style="color:var(--primary);">${u.name}</h4>
+          <p><b>Role:</b> ${u.role}</p>
+          <p><b>Phone:</b> ${u.phone}</p>
+          <p style="font-size:12px; margin-top:10px; color:var(--accent);">✨ Tap to View Profile & Grid Gallery</p>
+        </div>
+      `;
+    });
+
+    // Admin Panel Members List
+    const adminList = document.getElementById('admin-members-list');
+    adminList.innerHTML = '';
+    users.forEach(u => {
+      let delMemBtn = (u.role !== "Admin" && currentUser.role === "Admin") ? `<button class="btn btn-danger" onclick="deleteMember(${u.id})" style="margin-left:10px; padding:5px 10px; font-size:12px;">Delete Account</button>` : '';
+      adminList.innerHTML += `
+        <div class="card" style="margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+          <div><b>${u.name}</b> (${u.email}) - <span style="color:var(--primary);">${u.role}</span></div>
+          <div>
+            <button class="btn" onclick="openProfile(${u.id})" style="padding:5px 10px; font-size:12px;">View/Edit</button>
+            ${delMemBtn}
+          </div>
+        </div>
+      `;
+    });
+  }
+
+  // PROFILE MODAL (VIEW, EDIT, & PREMIUM PROFILE GRID MEDIA UPLOAD WITH ZOOM & DOWNLOAD)
+  function openProfile(userId) {
+    const targetUser = users.find(x => x.id === userId);
+    if(!targetUser) return;
+
+    if(!targetUser.mediaList) targetUser.mediaList = [];
+
+    const isSelfOrAdmin = (currentUser.id === targetUser.id || currentUser.role === "Admin");
+    const modalBody = document.getElementById('profile-modal-body');
+
+    // Build media items grid HTML
+    let mediaGridHtml = '';
+    if(targetUser.mediaList.length > 0) {
+      targetUser.mediaList.forEach((m, idx) => {
+        let delMediaBtn = isSelfOrAdmin ? `<button class="delete-media-btn" onclick="event.stopPropagation(); deleteProfileMedia(${targetUser.id}, ${idx})" title="Delete">&times;</button>` : '';
+        
+        let mediaContent = m.type === 'video' 
+          ? `<video src="${m.url}"></video>` 
+          : `<img src="${m.url}" alt="Media">`;
+
+        mediaGridHtml += `
+          <div class="profile-grid-item" onclick="openLightbox('${m.url}', '${m.type}')">
+            ${mediaContent}
+            ${delMediaBtn}
+            <div class="grid-overlay-btns">
+              <span class="grid-btn" title="Zoom View">🔍</span>
+              <a href="${m.url}" download="cousin_media" class="grid-btn" onclick="event.stopPropagation()" title="Download">📥</a>
+            </div>
+          </div>
+        `;
+      });
+    } else {
+      mediaGridHtml = `<p style="grid-column: 1/-1; text-align:center; opacity:0.6; font-size:13px;">No pictures or videos uploaded yet in profile grid.</p>`;
+    }
+
+    let uploadSectionHtml = '';
+    if(isSelfOrAdmin) {
+      uploadSectionHtml = `
+        <div class="card" style="margin-top:20px; background:rgba(0,0,0,0.3);">
+          <h4 style="font-size:16px; margin-bottom:10px; color:var(--primary);">Upload Picture / Video to Profile Grid</h4>
+          <div class="form-group">
+            <input type="file" id="profile-media-file" accept="image/*,video/*">
+          </div>
+          <button class="btn" onclick="uploadProfileMedia(${targetUser.id})" style="width:100%; padding:8px;">Upload to Grid</button>
+        </div>
+      `;
+    }
+
+    if(isSelfOrAdmin) {
+      modalBody.innerHTML = `
+        <div style="text-align:center; margin-bottom:20px;">
+          <img src="${targetUser.img}" style="width:120px; height:120px; object-fit:cover; border-radius:50%; border:2px solid var(--primary); cursor:pointer;" onclick="openLightbox('${targetUser.img}', 'image')">
+        </div>
+        <div class="form-group">
+          <label style="font-size:12px; opacity:0.7;">Name:</label>
+          <input type="text" id="edit-name" value="${targetUser.name}">
+        </div>
+        <div class="form-group">
+          <label style="font-size:12px; opacity:0.7;">Email:</label>
+          <input type="email" id="edit-email" value="${targetUser.email}">
+        </div>
+        <div class="form-group">
+          <label style="font-size:12px; opacity:0.7;">Password:</label>
+          <input type="text" id="edit-password" value="${targetUser.password}">
+        </div>
+        <div class="form-group">
+          <label style="font-size:12px; opacity:0.7;">Phone:</label>
+          <input type="text" id="edit-phone" value="${targetUser.phone}">
+        </div>
+        <div class="form-group">
+          <label style="font-size:12px; opacity:0.7;">New Profile Picture (Optional):</label>
+          <input type="file" id="edit-img" accept="image/*">
+        </div>
+        <button class="btn" onclick="saveProfileChanges(${targetUser.id})" style="width:100%; margin-top:10px;">Save Profile Changes</button>
+        
+        <hr style="border:0; border-top:1px solid rgba(255,255,255,0.1); margin:25px 0;">
+        <h4 style="color:var(--primary); margin-bottom:10px;">${targetUser.name}'s Premium Grid Gallery</h4>
+        <div class="profile-grid-container">${mediaGridHtml}</div>
+        ${uploadSectionHtml}
+      `;
+    } else {
+      modalBody.innerHTML = `
+        <div style="text-align:center; margin-bottom:20px;">
+          <img src="${targetUser.img}" style="width:120px; height:120px; object-fit:cover; border-radius:50%; border:2px solid var(--primary); cursor:pointer;" onclick="openLightbox('${targetUser.img}', 'image')">
+        </div>
+        <p style="margin:10px 0;"><b>Name:</b> ${targetUser.name}</p>
+        <p style="margin:10px 0;"><b>Email:</b> ${targetUser.email}</p>
+        <p style="margin:10px 0;"><b>Phone:</b> ${targetUser.phone}</p>
+        <p style="margin:10px 0;"><b>Role:</b> ${targetUser.role}</p>
+
+        <hr style="border:0; border-top:1px solid rgba(255,255,255,0.1); margin:25px 0;">
+        <h4 style="color:var(--primary); margin-bottom:10px;">${targetUser.name}'s Premium Grid Gallery</h4>
+        <div class="profile-grid-container">${mediaGridHtml}</div>
+      `;
+    }
+
+    document.getElementById('profile-modal').classList.remove('hidden');
+  }
+
+  function closeProfileModal() {
+    document.getElementById('profile-modal').classList.add('hidden');
+  }
+
+  // LIGHTBOX (ZOOM & DOWNLOAD) FUNCTIONS
+  function openLightbox(url, type) {
+    const wrapper = document.getElementById('lightbox-content');
+    const dlBtn = document.getElementById('lightbox-download-btn');
+    
+    dlBtn.href = url;
+
+    if(type === 'video') {
+      wrapper.innerHTML = `<video src="${url}" controls autoplay class="lightbox-media"></video>`;
+    } else {
+      wrapper.innerHTML = `<img src="${url}" class="lightbox-media" alt="Zoomed view">`;
+    }
+
+    document.getElementById('lightbox-modal').classList.remove('hidden');
+  }
+
+  function closeLightbox() {
+    document.getElementById('lightbox-content').innerHTML = '';
+    document.getElementById('lightbox-modal').classList.add('hidden');
+  }
+
+  // UPLOAD MEDIA TO PROFILE GRID
+  function uploadProfileMedia(userId) {
+    const targetUser = users.find(x => x.id === userId);
+    if(!targetUser) return;
+
+    const fileInput = document.getElementById('profile-media-file');
+    if(fileInput.files.length === 0) {
+      return alert("Please select a picture or video!");
+    }
+
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const fileType = file.type.startsWith('video') ? 'video' : 'image';
+      if(!targetUser.mediaList) targetUser.mediaList = [];
+      targetUser.mediaList.push({ type: fileType, url: e.target.result });
+      saveData();
+      openProfile(userId); // Refresh modal view
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // DELETE MEDIA FROM PROFILE GRID
+  function deleteProfileMedia(userId, mediaIdx) {
+    const targetUser = users.find(x => x.id === userId);
+    if(!targetUser) return;
+
+    if(confirm("Are you sure you want to delete this media from grid?")) {
+      targetUser.mediaList.splice(mediaIdx, 1);
+      saveData();
+      openProfile(userId);
+    }
+  }
+
+  function saveProfileChanges(userId) {
+    const targetUser = users.find(x => x.id === userId);
+    if(!targetUser) return;
+
+    const newName = document.getElementById('edit-name').value;
+    const newEmail = document.getElementById('edit-email').value;
+    const newPass = document.getElementById('edit-password').value;
+    const newPhone = document.getElementById('edit-phone').value;
+    const fileInput = document.getElementById('edit-img');
+
+    targetUser.name = newName;
+    targetUser.email = newEmail;
+    targetUser.password = newPass;
+    targetUser.phone = newPhone;
+
+    if(fileInput.files.length > 0) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        targetUser.img = e.target.result;
+        finalizeUpdate(targetUser);
+      };
+      reader.readAsDataURL(fileInput.files[0]);
+    } else {
+      finalizeUpdate(targetUser);
+    }
+  }
+
+  function finalizeUpdate(targetUser) {
+    saveData();
+    if(currentUser.id === targetUser.id) {
+      currentUser = targetUser;
+      document.getElementById('welcome-user').innerText = currentUser.name;
+    }
+    loadMembers();
+    closeProfileModal();
+    alert("Profile updated successfully!");
+  }
+
+  // DELETE MEMBER (ADMIN)
+  function deleteMember(userId) {
+    if(confirm("Are you sure you want to delete this member account?")) {
+      users = users.filter(u => u.id !== userId);
+      saveData();
+      loadMembers();
+      document.getElementById('total-members').innerText = users.length;
+    }
+  }
+
+  // FEED SYSTEM WITH GALLERY UPLOAD (PICTURE OR VIDEO)
+  function createPost() {
+    const text = document.getElementById('post-text').value;
+    const fileInput = document.getElementById('post-file');
+
+    if(!text && fileInput.files.length === 0) {
+      return alert("Kichu likhun ba picture/video select korun!");
+    }
+
+    if(fileInput.files.length > 0) {
+      const file = fileInput.files[0];
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const fileType = file.type.startsWith('video') ? 'video' : 'image';
+        pushPostToDb(text, e.target.result, fileType);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      pushPostToDb(text, null, null);
+    }
+  }
+
+  function pushPostToDb(text, mediaUrl, mediaType) {
+    const newPost = {
+      id: Date.now(),
+      userId: currentUser.id,
+      name: currentUser.name,
+      userImg: currentUser.img,
+      text: text,
+      mediaUrl: mediaUrl,
+      mediaType: mediaType,
+      time: new Date().toLocaleString()
+    };
+    posts.unshift(newPost);
+    saveData();
+    document.getElementById('post-text').value = '';
+    document.getElementById('post-file').value = '';
+    loadPosts();
+  }
+
+  function deletePost(id) {
+    posts = posts.filter(p => p.id !== id);
+    saveData();
+    loadPosts();
+  }
+
+  function loadPosts() {
+    document.getElementById('total-posts').innerText = posts.length;
+    const list = document.getElementById('posts-list');
+    list.innerHTML = '';
+    posts.forEach(p => {
+      let delBtn = (currentUser.role === "Admin" || currentUser.id === p.userId) ? `<button class="btn btn-danger" onclick="deletePost(${p.id})">Delete</button>` : '';
+      
+      let mediaTag = '';
+      if(p.mediaUrl) {
+        if(p.mediaType === 'video') {
+          mediaTag = `<video src="${p.mediaUrl}" controls class="post-media"></video>`;
+        } else {
+          mediaTag = `<img src="${p.mediaUrl}" class="post-media" alt="Post media" onclick="openLightbox('${p.mediaUrl}', 'image')">`;
+        }
+      }
+
+      let author = users.find(u => u.id === p.userId);
+      let authorImg = author ? author.img : (p.userImg || "https://i.pravatar.cc/400");
+
+      list.innerHTML += `
+        <div class="card post-card">
+          <div class="header">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <img src="${authorImg}" style="width:40px; height:40px; border-radius:50%; object-fit:cover; cursor:pointer;" onclick="openLightbox('${authorImg}', 'image')">
+              <div><b>${p.name}</b><br><small style="opacity:0.6;">${p.time}</small></div>
+            </div>
+            <div class="actions">${delBtn}</div>
+          </div>
+          <p style="margin-bottom:10px;">${p.text}</p>
+          ${mediaTag}
+        </div>
+      `;
+    });
+
+    // Admin Panel Posts List
+    const adminList = document.getElementById('admin-posts-list');
+    adminList.innerHTML = ``;
+    posts.forEach(p => {
+      adminList.innerHTML += `
+        <div class="card" style="margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+          <div><b>${p.name}:</b> ${p.text ? p.text.substring(0, 50) : '[Media Post]'}</div>
+          <button class="btn btn-danger" onclick="deletePost(${p.id})" style="padding:5px 10px; font-size:12px;">Delete Post</button>
+        </div>
+      `;
+    });
+  }
+
+  // BUBBLE ANIMATION
+  function createBubble() {
+    const bubble = document.createElement('div');
+    bubble.classList.add('bubble');
+    bubble.style.left = Math.random() * 100 + 'vw';
+    bubble.style.width = bubble.style.height = Math.random() * 40 + 10 + 'px';
+    bubble.style.animationDuration = Math.random() * 6 + 4 + 's';
+    document.getElementById('bubble-container').appendChild(bubble);
+    setTimeout(() => bubble.remove(), 10000);
+  }
+  setInterval(createBubble, 300);
+</script>
+</body>
+</html>
